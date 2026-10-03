@@ -5,20 +5,21 @@ use ratatui::{
     DefaultTerminal,
 };
 
-use crate::app::{App, Focus, ResultsState};
+use crate::app::App;
 use crate::event::{handle_key, Action};
-use crate::libgen::search;
 use crate::ui;
 
-const POLL_INTERVAL: Duration = Duration::from_millis(10);
+const POLL_INTERVAL: Duration = Duration::from_millis(16);
 
 pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
     loop {
+        app.poll_background().await;
         terminal
             .draw(|frame| ui::draw(frame, app))
             .expect("Failed to draw to terminal.");
 
-        if !poll(POLL_INTERVAL).expect("Failed to poll.") {
+        if !poll(Duration::ZERO).expect("Failed to poll.") {
+            tokio::time::sleep(POLL_INTERVAL).await;
             continue;
         }
 
@@ -32,13 +33,7 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
 
         match handle_key(app, key) {
             Action::None => {}
-            Action::Search(query) => {
-                terminal
-                    .draw(|frame| ui::draw(frame, app))
-                    .expect("Failed to draw to terminal.");
-
-                perform_search(app, &query).await;
-            }
+            Action::Search(query) => app.start_search(query),
             Action::Download => {
                 app.start_selected_download();
                 app.select_next();
@@ -46,36 +41,8 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
         }
 
         if app.should_quit {
+            app.shutdown().await;
             break;
-        }
-    }
-}
-
-async fn perform_search(app: &mut App, query: &str) {
-    let Some(mirror) = app.active_mirror.clone() else {
-        app.results_state = ResultsState::Failed("no mirror is reachable".to_string());
-        app.focus = Focus::SearchBar;
-        return;
-    };
-
-    let result = search::search(
-        &app.client,
-        &app.mirrors,
-        &mirror,
-        query,
-        app.config.max_results,
-    )
-    .await;
-
-    match result {
-        Ok((results, served_by)) => {
-            app.active_mirror = Some(served_by);
-            app.set_results(results);
-        }
-        Err(e) => {
-            log::error!("Search failed on all mirrors: {}", e);
-            app.results_state = ResultsState::Failed(e.to_string());
-            app.focus = Focus::SearchBar;
         }
     }
 }

@@ -49,10 +49,10 @@ pub fn merge(groups: &[&[String]]) -> Vec<String> {
 }
 
 async fn probe(client: Client, mirror: String) -> Result<ActiveMirror, ()> {
-    let url = format!("https://{}/", mirror);
+    let url = super::mirror_url(&mirror, "/").map_err(|_| ())?;
     info!("Testing connection to {}", url);
 
-    let response = match client.get(&url).send().await {
+    let response = match client.get(url.clone()).send().await {
         Ok(response) if response.status().is_success() => response,
         Ok(response) => {
             info!("{} responded with {}", mirror, response.status());

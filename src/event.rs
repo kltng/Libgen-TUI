@@ -43,12 +43,12 @@ fn search_bar_key(app: &mut App, key: KeyEvent) -> Action {
         KeyCode::Enter => {
             let query = app.query();
 
-            if query.len() < MIN_QUERY_LEN {
-                app.results_state = ResultsState::QueryTooShort;
+            if query.chars().count() < MIN_QUERY_LEN {
+                app.clear_results(ResultsState::QueryTooShort);
                 return Action::None;
             }
 
-            app.results_state = ResultsState::Searching;
+            app.clear_results(ResultsState::Searching);
             app.focus = Focus::Table;
             return Action::Search(query);
         }
@@ -84,24 +84,24 @@ fn table_key(app: &mut App, key: KeyEvent) -> Action {
         KeyCode::Char('k') | KeyCode::Up => app.select_previous(),
 
         KeyCode::Char('g') => {
-            if app.table_state.selected().is_some() {
+            if app.selected_book().is_some() {
                 app.table_state.select_first();
             }
         }
         KeyCode::Char('G') => {
-            if app.table_state.selected().is_some() {
+            if app.selected_book().is_some() {
                 app.table_state.select_last();
             }
         }
 
         KeyCode::Enter => {
-            if app.table_state.selected().is_some() {
+            if app.selected_book().is_some() {
                 app.show_popup = true;
                 app.focus = Focus::PopupYes;
             }
         }
 
-        KeyCode::Char(' ') if app.table_state.selected().is_some() => return Action::Download,
+        KeyCode::Char(' ') if app.selected_book().is_some() => return Action::Download,
 
         _ => {}
     }

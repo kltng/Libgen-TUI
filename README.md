@@ -59,18 +59,18 @@ Reopen your terminal afterwards.
 ### From source
 Needs a [Rust toolchain](https://rustup.rs). There is no OpenSSL or other system dependency to install first.
 ```sh
-cargo install --git https://github.com/Houdiee/libgen-tui
+cargo install --locked --git https://github.com/kltng/Libgen-TUI
 ```
 This drops the binary in `~/.cargo/bin`. To build a checkout instead:
 ```sh
-git clone https://github.com/Houdiee/libgen-tui
+git clone https://github.com/kltng/Libgen-TUI libgen-tui
 cd libgen-tui
-cargo build --release
+cargo build --release --locked
 ```
 The binary is then at `target/release/libgen-tui`; copy it somewhere on your `PATH`.
 
 ### NixOS users
-If you are struggling to build on nixos, run `nix-shell` within the project directory first, before running `cargo build --release`.
+If you are struggling to build on nixos, run `nix-shell` within the project directory first, before running `cargo build --release --locked`.
 
 ## Configuration
 On first run `libgen-tui` writes a configuration file if there isn't one already:
@@ -97,11 +97,36 @@ Use `additional_mirrors` to add domains of your own, for instance if the built-i
 
 Older versions kept a `mirrors` list in this file. That key is now ignored, so an old config picks up the current domains on its own.
 
+## Download behavior
+
+Downloads are streamed to temporary files in the configured directory, with at most three active transfers. Other downloads wait in the queue. Selecting the same book again does not start another job while it is pending or completed; failed jobs can be retried.
+
+Filenames include the book's full MD5 identifier, so editions sharing a title have different destinations. Titles and extensions are made safe for the filesystem. Existing files are never overwritten: a name conflict is reported as an error. Choose a different download directory or move the existing file before retrying.
+
+A download is published only after its MD5 matches the selected catalog entry. Network failures, HTML responses and checksum mismatches trigger another mirror attempt, including a fresh download-link lookup. Filesystem errors stop the attempt. Temporary files are removed on failure or normal cancellation; completed files remain when you quit.
+
+Metadata requests have a 30-second total timeout. File transfers have 30-second connection and read-inactivity timeouts, allowing large books to take longer than 30 seconds overall. Search stays responsive to keyboard input, and submitting another search cancels the previous one. Quitting cancels pending searches and downloads.
+
+Bare mirror names use HTTPS. An explicit `http://` or `https://` base URL can also be used for a private or local mirror.
+
+## Development checks
+
+```sh
+cargo fmt --all --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo build --release --locked
+cargo install cargo-audit --locked
+cargo audit
+```
+
+The default tests use local HTTP fixtures, exercise UI state and parsing, and never fetch a book from a public mirror. One transfer test intentionally takes about 32 seconds. CI executes these tests on Linux, macOS and Windows and checks dependency advisories.
+
 ## Troubleshooting
 Libgen changes its domains and page layout from time to time, which breaks searching or downloading. To find out which stage broke, run the live tests:
 ```sh
-cargo test
+cargo test --locked --test pipeline -- --ignored --nocapture
 ```
-They check mirror reachability, result parsing, download-link resolution and an actual download, and report which one fails.
+This opt-in test (also available through the manual `live pipeline` workflow) checks mirror reachability, result parsing, download-link resolution and an actual download, and report which one fails.
 
 Run with `RUST_LOG=debug libgen-tui 2>log.txt` to record what each request did. Logging is off by default because it writes to stderr, which would otherwise draw over the interface.

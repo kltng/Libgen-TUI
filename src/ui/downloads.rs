@@ -12,7 +12,7 @@ const KEY_HINTS: &str = "[ h,j,k,l = left,down,right,left | Enter = submit | Spa
 
 fn status_cell(status: DownloadStatus) -> Cell<'static> {
     let (text, color) = match status {
-        DownloadStatus::Pending => ("Downloading...", Color::Yellow),
+        DownloadStatus::Pending => ("Queued / downloading", Color::Yellow),
         DownloadStatus::Completed => ("Download complete!", Color::Green),
         DownloadStatus::Failed => ("Download failed", Color::Red),
     };

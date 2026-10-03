@@ -29,10 +29,11 @@ impl Downloads {
         self.inner.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    pub fn start(&self, title: &str, md5: &str) {
+    pub fn start(&self, title: &str, md5: &str) -> bool {
         let mut downloads = self.lock();
 
         match downloads.iter_mut().find(|d| d.md5 == md5) {
+            Some(existing) if existing.status != DownloadStatus::Failed => return false,
             Some(existing) => {
                 existing.status = DownloadStatus::Pending;
                 existing.error = None;
@@ -44,6 +45,7 @@ impl Downloads {
                 error: None,
             }),
         }
+        true
     }
 
     pub fn complete(&self, md5: &str) {

@@ -19,15 +19,22 @@ pub struct Book {
 }
 
 fn text_without_italics(element: ElementRef) -> String {
-    let italic_selector = Selector::parse("i").unwrap();
-    let mut text = element.text().collect::<String>();
-
-    for italic in element.select(&italic_selector) {
-        let italic_text = italic.text().collect::<String>();
-        if !italic_text.trim().is_empty() {
-            text = text.replace(&italic_text, "");
-        }
-    }
+    let text: String = element
+        .descendants()
+        .filter_map(|node| {
+            let text = node.value().as_text()?;
+            let in_italics = node
+                .ancestors()
+                .take_while(|ancestor| ancestor.id() != element.id())
+                .any(|ancestor| {
+                    ancestor
+                        .value()
+                        .as_element()
+                        .is_some_and(|e| e.name() == "i")
+                });
+            (!in_italics).then_some(text.text.as_ref())
+        })
+        .collect();
 
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
@@ -184,6 +191,8 @@ pub fn parse_books(body: &str) -> Vec<Book> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum SearchError {
+    #[error("invalid mirror URL: {0}")]
+    Url(#[from] url::ParseError),
     #[error("request failed: {0}")]
     Request(#[from] reqwest::Error),
     #[error("not a libgen search page")]
@@ -201,12 +210,10 @@ pub async fn search_mirror(
     query: &str,
     max_results: usize,
 ) -> Result<Vec<Book>, SearchError> {
-    let url = format!(
-        "https://{}/index.php?req={}&res={}",
+    let url = super::mirror_url(
         mirror,
-        encode(query),
-        max_results
-    );
+        &format!("/index.php?req={}&res={}", encode(query), max_results),
+    )?;
 
     let body = client
         .get(url)
